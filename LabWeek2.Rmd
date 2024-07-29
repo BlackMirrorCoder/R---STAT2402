@@ -1,0 +1,375 @@
+---
+title: "STAT2402 Analysis of Observations"
+author: "Computer Lab # - RMD "
+date: "Today"
+output:
+  html_document: null
+  html_notebook: default
+  pdf_document: null
+  word_document: null
+---
+
+# Computer Lab Week 
+
+We provide the pdf solutions every week and this template so that you can use this template to understand the concept, method, modelling and R code that being provided in the solution.
+
+1. Open the questions file and the pdf solutions, side by side as tabs.
+
+2. Use this template to create new chunks within each question (Ctrl Alt I for Windows).
+
+3. Copy-paste-update-understand the solution, by copy and paste R code in the solution into new chunks.
+
+4. Execute the chunks. Check if you have the same results as the solutions.
+
+5. While trying to understand the solution, add your own comments outside the chunks.
+
+```{r eval=FALSE, include=FALSE}
+## There are a few options in every chunk, click the setting button (greyed) near the triangle:
+# 1. to use default as in the above (show code and output, ie ECHO=TRUE) or 
+# 2. to show output only (ie ECHO=FALSE) or
+# 3. show nothing (run code) ie include=FALSE
+# 4. show nothing (dont run the code), like this chunk, ie eval=FALSE, include=FALSE
+## You can knit this template into Word and then update it into pdf etc.
+## You can create your own way for reproducing the R code using Rmarkdown, this is just an example if you are going to use Rmd.
+```
+
+The following question is an example from Lab 2 Question 1.
+
+## Question 1 
+
+Reading the data
+
+```{r}
+Material<-factor(rep(c(1,2,3),each=12,length=36))
+Temperature<-factor(rep(c(-10,20,55),each=4,length=36))
+Life<-c(130,155,74,180,34,40,80,75,20,70,82,58,150,
+188,159,126,136,122,106,115,25,70,58,45,138,110,168,
+160,174,120,150,139,96,104,82,60)
+Battery<-data.frame(Material, Temperature, Life)
+
+```
+
+To check the data types
+
+```{r}
+str(Battery)
+```
+From the above dataset: Material and Temperature are categorical; Material1 is the base; Temperature=-10 is the base. 
+
+Can you elaborate about this, by showing the indicator variables of Material and Temperature
+
+
+```{r}
+with(Battery,tapply(Life,list(Material, Temperature), mean))
+# (130+155+74+180) / 4 = 134.75
+```
+What is the mean of Life when Temperature=-10 and Material=3?
+
+
+```{r}
+library(MASS)
+bat.lm<-lm(Life~Material*Temperature,data= Battery)
+summary(bat.lm)
+bat.lm.backward <- stepAIC(bat.lm, direction = "backward")
+summary(bat.lm.backward)
+
+```
+From the above output:
+
+- Material is not significant (p-values > 5\%)
+- Temperature is significant
+- Interaction between Material and Temperature is significant.
+
+In the following, I can plot the diagnostics differently to the solutions (based on STAT2401)
+
+```{r}
+par(mfrow=c(2,2))
+plot(bat.lm)
+```
+
+
+## Question 2
+```{r}
+Injury <- gl(n=4, labels = c("fatal", "severe", "minor", "unknown"), k = 3, length = 12)
+Seatbelts <- gl(n= 3, labels = c("worn", "not worn", "unknown"), k = 1, length = 12)
+Frequency <- c(35, 6, 15, 1142, 48, 328, 7969, 76, 764, 11404, 24, 38570)
+Accident <- data.frame(Injury, Seatbelts, Frequency)
+xtabs(Frequency ~ Injury + Seatbelts)
+```
+
+```{r}
+# Create the expanded dataset
+expanded_data <- data.frame(Injury = rep(Injury, Frequency), Seatbelts = rep(Seatbelts, Frequency))
+
+# Display the table to verify
+table(expanded_data)
+
+```
+
+
+## Question 3 
+
+```{r}
+fish <- read.table("Fish.txt", header = T)
+fish
+summary(fish)
+```
+```{r}
+x <- which(fish$Weight==0)
+fish1 <- fish[-x,]
+summary(fish1)
+```
+```{r}
+fish1$Code <- factor(fish1$Code)
+weight.lm <- lm(Weight ~ Code + Length1 + Length2 + Length3 + Height +
+    Width, data = fish1)
+summary(weight.lm)
+```
+```{r}
+weight.lm <- lm(Weight ~ .^2, data = fish1)
+summary(weight.lm)
+```
+Some interactions are significant. We reduce the model using stepAIC
+```{r}
+library(MASS)
+x <- stepAIC(weight.lm, trace = 0)
+x
+
+weight.lm1 <- lm(Weight ~ Code + Length1 + Length2 + Length3 + Height + 
+    Width + Code:Length1 + Code:Length2 + Code:Height + Length1:Length2 + 
+    Length1:Height + Length1:Width + Length2:Height + Length2:Width + 
+    Length3:Width + Height:Width, data = fish1)
+summary(weight.lm1)
+```
+
+```{r}
+weight.lm2 <- update(weight.lm1, .~. - Length3:Width)
+summary(weight.lm2)
+```
+```{r}
+names(weight.lm2)
+par(mfrow = c(2,2))
+plot(weight.lm2$residuals ~ weight.lm2$fitted.values)
+```
+```{r}
+with(fish1, plot(Weight ~ Length1, main = "Weight ~ Length1"))
+with(fish1, plot(Weight ~ Length2, main = "Weight ~ Length2"))
+with(fish1, plot(Weight ~ Length3, main = "Weight ~ Length3"))
+with(fish1, plot(Weight ~ Height, main = "Weight ~ Height "))
+with(fish1, plot(Weight ~ Width, main = "Weight ~ Width"))
+```
+```{r}
+fish.lm1 <- lm(Weight ~ Code + I(Length1^2) + I(Length2^2) + I(Length3^2) +
+    Width + Height, data = fish1)
+summary(fish.lm1)
+
+plot(fish.lm1$residuals ~ fish.lm1$fitted.values)
+```
+The residuals look better, but there is still a pattern, and the values of the residuals are quite large. Also, the values of some of the standard errors are still quite large. We next fit an exponential model.
+```{r}
+fish.lm2 <- lm(log(Weight) ~ Code + Length1 + Length2 + Length3+ Width + Height, data = fish1)
+summary(fish.lm2)
+plot(fish.lm2$residuals ~ fish.lm2$fitted.values)
+```
+
+```{r}
+plot(fish.lm2$residuals~fish1$Length1)
+plot(fish.lm2$residuals ~ fish1$Length2)
+plot(fish.lm2$residuals ~ fish1$Length3)
+```
+
+```{r}
+fish.lm3 <- update(fish.lm2, . ~ . - Length1)
+summary(fish.lm3)
+```
+
+```{r}
+fish.lm4 <- update(fish.lm3, . ~ . - Length2)
+summary(fish.lm4)
+```
+Perform model diagnostics. For this, plot a histogram of the residuals and a scatter plot of the residuals against the fitted values. Comment on whether the model assumptions are satisfied.
+
+```{r}
+plot(fish.lm4$residuals ~ fish.lm4$fitted.values, xlab = "Fitted values", ylab = "Residuals")
+hist(fish.lm4$residuals, xlab = "Residuals")
+box()
+qqnorm(fish.lm4$residuals)
+qqline(fish.lm4$residuals)
+plot(exp(fish.lm4$fitted.values) ~ fish1$Weight)
+abline(0,1)
+```
+```{r}
+fish1[which(fish1$Weight > 1100),]
+plot(fish1$Weight ~ fish1$Code, xlab = "Code", ylab = "Weight")
+```
+
+### Exercise 4 Bank Data
+
+H0: There is no gender discrimination in salary
+H1: There is gender discrimination in salary
+
+
+```{r}
+bank <- read.table("Bank.txt", header = T)
+names(bank)
+# bank <- data <- data[, -1] # Remove employees' number
+# bank # Why we can't remove the employee number?
+library(plyr)
+library(MASS)
+library(car)
+bank$EducLev <- factor(bank$EducLev)
+bank$EducLev <- revalue(bank$EducLev, c('1'='HS', '2'='TE', '3' = 'Bach', '4' = 'PGrad', '5' = 'PGDegree'))
+bank$JobGrade <- factor(bank$JobGrade)
+bank$Exp <- 95 - bank$YrHired
+bank.lm <- lm(Salary ~ EducLev + JobGrade + YrBorn + Gender + YrsPrior + Exp + PCJob, data = bank )
+summary(bank.lm)
+```
+
+```{r}
+bank.lm.backward <- stepAIC(bank.lm, direction = "backward", trace = 0)
+#par(mfrow = c(2, 2))
+plot(bank.lm.backward)
+shapiro.test(bank.lm.backward$residuals)
+hist(bank.lm.backward$residuals)
+bank
+
+```
+
+```{r}
+plot(bank.lm.backward, which = 5)
+abline(h = 4, col= 'red', lty = 2)
+abline(h = -4, col = 'red', lty =2)
+```
+
+
+## Residuals Vs Fitted - Check Linearity
+Pattern: Ideally, residuals should be randomly scattered around the horizontal line at 0 without any clear pattern. This indicates that the model's errors are random and not systematically biased.
+
+observed: The majority of the residuals are clustered around -, which is good, However, there is some spread, particularly with a few residuals far from zero, indicating potential issues with the model fit for those observations.
+Non-Linearity: The red line shows a slight curve and does not stay flat, suggesting some non-linearlity in the data that the linear model has not captured. 
+
+Heteroscedasticity(constant variant): There appears to be some heteroscedasticity, as the residuals are more spread out for hgiher fitted values. This suggests that the variance of the residuals is not constant.
+
+Outliers: There are several points with large residuals (both positive and negative)
+Influential points: 204, 205, 208
+
+## Q-Q Residuals - Check Normal Distribution
+Most of points lie on the line, so normal distribution satisfied. However, there are deviations at the upper and bottom tails, suggesting that the residuals have heavier tails than a normal distribution. This indicates the presence of outliers or extreme values.
+
+## Square Root of Standardized Residuals vs Fitted Values plot
+There is a incresing pattern around 55, which indicates the vairance of the residuals increases with the fitted values, suggesting heteroscedasticity and non-constant variance
+
+## Residual Vs Leverage - Outliers
+Since most of plots lie between 4 and -4. Hence, residuals outside this range will be considered as outliers, such as 204, 205 and 208.
+
+### Lab Solution for this question
+```{r}
+options(width = 80)
+rm(list = ls(all = TRUE))
+bank <- read.table("Bank.txt", header = T)
+library(plyr)
+library(MASS)
+library(car)
+bank$JobGrade <- factor(bank$JobGrade)
+bank$EducLev <- factor(bank$EducLev)
+bank$EducLev <- revalue(bank$EducLev, c('1'='HS', '2' = 'TE', '3' = 'Bach', '4' = 'PGrade', '5' = "PGDegree"))
+bank$Exp <- 95 - bank$YrHired
+
+bank.lm <- lm(Salary ~ YrsPrior + Exp + YrBorn + Gender + PCJob + EducLev + JobGrade, data = bank)
+summary(bank.lm)
+```
+```{r}
+bank.lm1 <- update(bank.lm, .~. -YrBorn)
+summary(bank.lm1)
+```
+
+```{r}
+anova(bank.lm, bank.lm1)
+```
+```{r}
+bank.lm2 <- update(bank.lm1, .~. - YrsPrior)
+summary(bank.lm2)
+```
+```{r}
+anova(bank.lm1, bank.lm2)
+```
+Conclusion
+The ANOVA table suggests that including "YrsPrior" in the model does not significantly improve the fit. Therefore, Model 2(without "YrsPrior") is not significantly worse than Model 1 (with "YrsPrior"), and it might be preferable to use the simpler model.
+
+Summary
+- Residual Degrees of Freedom: Indicates the complexity of the models (more parameters reduce the degrees of freedom).
+- Residual Sum of Squares: Meausres the fit of the models (Lower RSS indicates a better fit).
+- F Value: Tests whether the additional parameters in the more complex model significantly improve the fit. 
+- p-value(Pr(>F)): Indicates the significance of the F test (higher p-value means less significant improvement).
+
+```{r}
+bank.lm3 <- update(bank.lm2, .~. -EducLev)
+summary(bank.lm3)
+```
+Exp: each additional year of experience increase 0.4419 units on Salary.
+GenderMale: Being male is associated with an increase in Salary by approximately 2.78568 units compred to females
+....
+Statistical Significance:
+The p-value for GenderMale is 0.005842, which is less then 0.05, indicating that gender is a statistically significant predictor of salary, suggesting evidence of gender discrimination.
+
+```{r}
+anova(bank.lm2, bank.lm3)
+```
+```{r}
+oldpar <- par(mfrow = c(2,2))
+par(cex = 0.5)
+bank.stdres = rstandard(bank.lm3)
+hist(bank.stdres, xlab = "Residuals")
+box()
+boxplot(bank.stdres, ylab = "Standardised Residuals")
+plot(bank.stdres ~ bank.lm3$fitted.values, main = "Bank Data: Std Res against Fitted", xlab = "Fitted values", ylab = "Standadised residuals")
+abline(0,0)
+qqnorm(bank.stdres, ylab = "Standardised Residuals", xlab = "Normal Scores", main = "Normal Probabilitiy plot")
+qqline(bank.stdres)
+par(oldpar)
+```
+
+## Answer from Lab
+Main Observations: The central issue is presence of outliers. The perceived issues with normality and constant variance are a result of these outliers. Once the outlier issue is fixed, hese other issues should be resolved, but of course we will need to re-investigate the model diagnostics. What do we do with the outliers? First, we need to identify what they represent. Two scatterplots are produced below.
+
+What do we do with the outliers? First, we need to identify what they represent. Two scatterplots are produced below.
+
+```{r}
+library(car)
+scatterplot(bank.stdres ~ bank.lm3$fitted.values | bank$Gender, regLine = FALSE, smooth = FALSE, main = "                  Bank Data: Std Res against Fitted", xlab = "Fitted Values", ylab = "Standadised residuals")
+plot(bank.stdres ~ bank.lm3$fitted.values, pch = bank$Gender, col = bank$JobGrade, ylim = c(-8,5))
+legend(x=30, y = -2, legend = c(1:6), lty = 1:6, col = c(1:6))
+```
+
+```{r}
+(x <- which(bank.stdres < -6))
+bank[x,]
+```
+
+# Interaction Terms
+```{r}
+bank.lm3 <- update(bank.lm2, .~. + JobGrade:Gender)
+summary(bank.lm3)
+```
+
+```{r}
+anova(bank.lm2, bank.lm3)
+```
+
+```{r}
+oldpar <- par(mfrow = c(2,2))
+par(cex = 0.3)
+#interaction.plot(JobGrade, Gender, Salary)
+bank.stdres = rstandard(bank.lm3)
+#hist(bank,stdres, main = "Bank Data", xlab = "Standadised residuals", ylab = "Frequency")
+#box()
+#boxplot(bank.stdres ~ Gender * JobGrade, ylab = "Standardised Residuals", xaxt = "n")
+axis(1, labels = c("F1", "M1", "F2", "M2", "F3", "M3", "F4", "M4", "F5", "M5", "F6",
+    "M6"), at = c(1:12))
+plot(bank.stdres ~ bank.lm3$fitted.values, main = "Bank Data: Std Res against Fitted",
+    xlab = "Fitted values", ylab = "Standadised residuals")
+abline(0, 0)
+qqnorm(bank.stdres, ylab = "Standardized Residuals", xlab = "Normal Scores", main = "Normal Probability plot")
+qqline(bank.stdres)
+```
+
